@@ -1,0 +1,10 @@
+Perfect, {{first_name}}! Here's your personal booking link — your info is already filled in, just pick a date and time:
+
+{{booking_url}}
+
+Steps:
+1. Tap the link above
+2. Choose a date and time that works for you
+3. Tap "Confirm Appointment" — that's it!
+
+You'll get a confirmation text once you're booked. Questions? Call or text us at (725) 296-8281.

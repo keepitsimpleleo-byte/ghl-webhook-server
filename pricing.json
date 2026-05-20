@@ -1,0 +1,18 @@
+{
+  "window_cleaning": {
+    "exterior_no_screens":          10.00,
+    "exterior_with_screens":        13.00,
+    "interior_add_no_screens":       5.00,
+    "interior_add_with_screens":     6.50,
+    "max_window_count":             30
+  },
+  "solar_panels": {
+    "single_story_per_panel":        5.00,
+    "double_story_per_panel":        8.00
+  },
+  "notes": {
+    "window_pricing": "Per-window pricing. All four options shown in quote.",
+    "solar_pricing":  "Per-panel pricing based on home stories (single vs double).",
+    "max_windows":    "Quotes above 30 windows prompt a custom quote request."
+  }
+}

@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: ghl-webhook-server
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python webhook_server.py
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "10000"

@@ -1,0 +1,7 @@
+Thank you {{first_name}}, I got your inquiry!
+
+Just to confirm — you have a {{home_stories}} home with {{solar_count}} solar panels. Does that sound right?
+
+Reply YES to confirm and I'll send you a price right away!
+
+— Blue's Home Services (725) 296-8281

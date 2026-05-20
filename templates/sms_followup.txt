@@ -1,0 +1,5 @@
+Hi {{first_name}}, just wanted to follow up from Blue's Home Services!
+
+We noticed you haven't confirmed your {{service_type}} quote yet. We'd love to help — when you're ready, just reply YES and we'll send your price right away.
+
+Or call us at (725) 296-8281. We're here Monday–Saturday, 8am–4pm!

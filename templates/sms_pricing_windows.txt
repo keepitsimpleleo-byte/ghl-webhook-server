@@ -1,0 +1,10 @@
+Great, thanks for confirming {{first_name}}!
+
+Based on your {{window_count}} windows, here's your estimate:
+
+{{price_range}}
+
+Would you like to move forward with booking or would you like to speak to a team member now?
+
+Reply BOOK to schedule your appointment directly
+Reply CALL to speak to a team member
