@@ -61,7 +61,7 @@ def new_lead():
     log.info(f"New-lead webhook received. Keys: {list(data.keys())}")
 
     contact = data.get("contact") or {}
-    contact_id = contact.get("id") or data.get("contact_id")
+    contact_id = contact.get("id") or data.get("contactId") or data.get("contact_id")
     first_name = contact.get("firstName", "") or data.get("first_name", "")
     phone = contact.get("phone", "") or data.get("phone", "")
     email = contact.get("email", "") or data.get("email", "")
