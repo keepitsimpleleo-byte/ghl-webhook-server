@@ -219,6 +219,16 @@ def inbound_sms():
     custom_fields = extract_custom_fields(full_contact, field_defs)
     campaign_data = build_campaign_data(custom_fields)
 
+    # If the customer mentioned a specific count in their reply, use it instead of the stored GHL value
+    reply_nums = [int(n) for n in re.findall(r'\b(\d+)\b', body) if 1 <= int(n) <= 200]
+    if len(reply_nums) == 1:
+        if campaign_data.get("type") == "solar":
+            campaign_data["solar_count"] = str(reply_nums[0])
+            log.info(f"Panel count overridden from reply: {reply_nums[0]}")
+        elif campaign_data.get("type") == "windows":
+            campaign_data["window_count"] = str(reply_nums[0])
+            log.info(f"Window count overridden from reply: {reply_nums[0]}")
+
     success = send_pricing_sms(
         headers, contact_id, conversation_id, phone, first_name, campaign_data
     )

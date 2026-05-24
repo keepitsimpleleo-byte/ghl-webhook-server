@@ -203,13 +203,15 @@ def get_window_price(window_count_text):
 
 
 def parse_panel_range(panel_range_text):
-    """Parse '1–10' or '10–20' into (min, max). Handles both hyphens and en-dashes."""
-    numbers = re.findall(r'\d+', panel_range_text or "")
+    """Parse '1–10', '20–30', or '26+' into (min, max). '+' suffix means up to 100 panels."""
+    text = panel_range_text or ""
+    has_plus = "+" in text
+    numbers = re.findall(r'\d+', text)
     if len(numbers) >= 2:
         return int(numbers[0]), int(numbers[1])
     if len(numbers) == 1:
         n = int(numbers[0])
-        return n, n
+        return n, 100 if has_plus else n
     return None, None
 
 
