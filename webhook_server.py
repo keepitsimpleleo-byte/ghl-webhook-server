@@ -16,24 +16,29 @@ Register in GHL:
 """
 
 import os
+import re
 import logging
 import sys
 
+import requests
 from twilio.rest import Client as TwilioClient
 
 sys.path.insert(0, os.path.dirname(__file__))
 
 from flask import Flask, request, jsonify
 from send_lead_response import (
+    BASE_URL,
     SKIP_TAG,
     PRICING_TAG,
     BOOKING_TAG,
     FOLLOWUP_TAG,
+    SERVICE_LABELS,
     get_headers,
     get_contact_full,
     get_custom_field_definitions,
     extract_custom_fields,
     build_campaign_data,
+    get_appointment_price_label,
     get_or_create_conversation,
     send_sms,
     send_pricing_sms,
@@ -342,6 +347,120 @@ def inbound_alert():
         return jsonify({"status": "error", "reason": str(e)}), 500
 
 
+@app.route("/appointment-booked", methods=["POST"])
+def appointment_booked():
+    """
+    GHL fires this when an appointment is created via the calendar widget.
+    Updates the calendar event title with service + pricing and sends a confirmation SMS.
+
+    Register in GHL:
+      Settings > Integrations > Webhooks > Add Webhook
+      Event: AppointmentCreated
+      URL: http://your-public-ip:5000/appointment-booked
+    """
+    data = request.get_json(force=True) or {}
+    log.info(f"Appointment-booked webhook received. Keys: {list(data.keys())}")
+
+    appt = data.get("appointment") or data
+    appointment_id  = appt.get("id") or appt.get("appointmentId") or data.get("appointmentId")
+    contact_id      = appt.get("contactId") or data.get("contactId")
+    calendar_id     = (appt.get("calendarId") or data.get("calendarId")
+                       or os.environ.get("GHL_CALENDAR_ID", "WcMuX2qHzZeszRG4AzTM"))
+    start_time_raw  = appt.get("startTime") or data.get("startTime", "")
+    end_time_raw    = appt.get("endTime")   or data.get("endTime", "")
+    address         = appt.get("address")   or data.get("address", "")
+
+    if not contact_id or not appointment_id:
+        log.warning("Missing contactId or appointmentId — ignoring.")
+        return jsonify({"status": "ignored", "reason": "missing ids"}), 200
+
+    headers     = get_headers()
+    location_id = os.environ.get("GHL_LOCATION_ID", "")
+
+    full_contact = get_contact_full(headers, contact_id)
+    if not full_contact:
+        log.error(f"Could not fetch contact {contact_id}")
+        return jsonify({"status": "error", "reason": "contact not found"}), 500
+
+    first_name = full_contact.get("firstName", "there")
+    phone      = full_contact.get("phone", "")
+
+    field_defs    = get_custom_field_definitions(headers, location_id)
+    custom_fields = extract_custom_fields(full_contact, field_defs)
+    campaign_data = build_campaign_data(custom_fields)
+
+    service_label = SERVICE_LABELS.get(campaign_data.get("type", ""), "Home Service")
+    price_str     = get_appointment_price_label(campaign_data)
+
+    new_title = (
+        f"{service_label} – Est. {price_str} | Blue's Home Service"
+        if price_str else
+        f"{service_label} | Blue's Home Service"
+    )
+
+    update_payload = {
+        "calendarId":        calendar_id,
+        "locationId":        location_id,
+        "startTime":         start_time_raw,
+        "endTime":           end_time_raw,
+        "title":             new_title,
+        "appointmentStatus": "confirmed",
+        "contactId":         contact_id,
+    }
+    upd = requests.put(
+        f"{BASE_URL}/calendars/events/appointments/{appointment_id}",
+        headers=headers,
+        json=update_payload,
+    )
+    if upd.status_code in (200, 201):
+        log.info(f"Appointment {appointment_id} title updated: {new_title!r}")
+    else:
+        log.warning(f"Title update failed: {upd.status_code} {upd.text}")
+
+    if not phone:
+        log.warning(f"No phone for contact {contact_id} — skipping confirmation SMS.")
+        return jsonify({"status": "title_updated", "sms": "skipped_no_phone"}), 200
+
+    try:
+        # Normalize ISO 8601 offset (e.g. -07:00 → -0700) for fromisoformat on Python < 3.11
+        dt_str = re.sub(r'([+-]\d{2}):(\d{2})$', r'\1\2', start_time_raw)
+        from datetime import datetime as _dt
+        dt = _dt.fromisoformat(dt_str)
+        appt_label = dt.strftime("%A, %B %-d at %-I:%M %p")
+    except Exception:
+        appt_label = start_time_raw or "your scheduled time"
+
+    sms_body = (
+        f"Hi {first_name}! Your Blue's Home Service appointment is confirmed — "
+        f"{service_label} on {appt_label}."
+    )
+    if address:
+        sms_body += f" Address: {address}."
+    sms_body += " Questions? Call or text (725) 296-8281. See you then!"
+
+    conversation_id = get_or_create_conversation(headers, contact_id, location_id)
+    if conversation_id:
+        sms_payload = {
+            "type":           "SMS",
+            "conversationId": conversation_id,
+            "contactId":      contact_id,
+            "message":        sms_body,
+        }
+        sms_resp = requests.post(
+            f"{BASE_URL}/conversations/messages",
+            headers=headers,
+            json=sms_payload,
+        )
+        if sms_resp.status_code in (200, 201):
+            log.info(f"Confirmation SMS sent to {phone} (contact {contact_id})")
+        else:
+            log.error(f"Confirmation SMS failed: {sms_resp.status_code} {sms_resp.text}")
+    else:
+        log.error(f"Could not get conversation for {contact_id} — SMS not sent.")
+
+    return jsonify({"status": "ok", "title": new_title}), 200
+
+
 @app.route("/pricing", methods=["GET"])
 def pricing():
     """Returns the current pricing data as JSON — used by the instant quote website."""
@@ -363,7 +482,8 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     log.info(f"Webhook server listening on port {port}")
     log.info(f"Register in GHL:")
-    log.info(f"  /new-lead       → Event: Contact Created")
-    log.info(f"  /inbound-sms    → Event: Inbound Message (SMS, for pricing reply)")
-    log.info(f"  /inbound-alert  → Event: Inbound Message (all channels, owner alert)")
+    log.info(f"  /new-lead            → Event: Contact Created")
+    log.info(f"  /inbound-sms         → Event: Inbound Message (SMS, for pricing reply)")
+    log.info(f"  /inbound-alert       → Event: Inbound Message (all channels, owner alert)")
+    log.info(f"  /appointment-booked  → Event: AppointmentCreated")
     app.run(host="0.0.0.0", port=port)

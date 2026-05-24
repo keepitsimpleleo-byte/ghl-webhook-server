@@ -27,7 +27,7 @@ PRICING_TAG = "pricing-sent"
 BOOKING_TAG = "booking-link-sent"
 FOLLOWUP_TAG = "follow-up-sent"
 
-BOOKING_URL = "https://www.blueshomeservices.com/book.html"
+BOOKING_URL = "https://api.leadconnectorhq.com/widget/booking/WcMuX2qHzZeszRG4AzTM"
 CONSULT_URL = "https://api.leadconnectorhq.com/widget/bookings/blues-phone-consultation"
 
 # Maps campaign type → service label used in the booking page URL
@@ -220,7 +220,26 @@ def get_solar_price(home_stories, panel_range):
     if min_p is None:
         return "Reply with your panel count and I'll get you a price right away!"
     low, high = min_p * rate, max_p * rate
-    return f"{_fmt(low)}–{_fmt(high)}"
+    return _price_range(low, high)
+
+
+def get_appointment_price_label(campaign_data):
+    """Return a short price string for a calendar event title (e.g. '$130–$390'), or None."""
+    campaign_type = campaign_data.get("type", "")
+    if campaign_type == "windows":
+        min_c, max_c = parse_window_count(campaign_data.get("window_count", ""))
+        if min_c is None:
+            return None
+        rate = WINDOW_RATES["exterior_no_screens"]
+        return _price_range(min_c * rate, min(max_c, MAX_WINDOW_COUNT) * rate)
+    if campaign_type == "solar":
+        story_key = "double" if "double" in (campaign_data.get("home_stories") or "").lower() else "single"
+        rate = SOLAR_RATES[story_key]
+        min_p, max_p = parse_panel_range(campaign_data.get("solar_count", ""))
+        if min_p is None:
+            return None
+        return _price_range(min_p * rate, max_p * rate)
+    return None
 
 
 def has_been_contacted(contact):
@@ -355,21 +374,16 @@ def send_pricing_sms(headers, contact_id, conversation_id, phone, first_name, ca
 
 
 def build_booking_url(contact, campaign_data=None):
-    """
-    Build a pre-filled booking URL for blueshomeservices.com/book.html.
-    Includes firstName, lastName, phone, email, and service from the lead's original data.
-    The lead only needs to pick a date and time.
-    """
-    params = {"type": "inperson"}
-    params["firstName"] = contact.get("firstName", "")
-    params["lastName"]  = contact.get("lastName", "")
-    params["phone"]     = contact.get("phone", "")
-    params["email"]     = contact.get("email", "")
-
-    if campaign_data:
-        campaign_type = campaign_data.get("type", "")
-        params["service"] = SERVICE_LABELS.get(campaign_type, "Home Service")
-
+    """Build a GHL calendar booking URL tied to the existing contact to avoid duplicate-contact errors."""
+    contact_id = contact.get("id") or contact.get("contactId") if contact else None
+    if contact_id:
+        return f"{BOOKING_URL}?contactId={contact_id}"
+    # Fallback when no contact ID is available: pre-fill fields instead
+    params = {}
+    params["firstName"] = contact.get("firstName", "") if contact else ""
+    params["lastName"]  = contact.get("lastName", "")  if contact else ""
+    params["phone"]     = contact.get("phone", "")     if contact else ""
+    params["email"]     = contact.get("email", "")     if contact else ""
     return f"{BOOKING_URL}?{urlencode(params)}"
 
 
