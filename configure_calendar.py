@@ -49,7 +49,7 @@ def patch_calendar():
     payload = {
         "slotDuration":           60,
         "slotInterval":           60,
-        "preBuffer":              15,
+        "preBuffer":              30,
         "preBufferUnit":          "mins",
         "googleInvitationEmails": False,
         "openHours": [
