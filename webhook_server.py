@@ -399,8 +399,10 @@ def appointment_booked():
     custom_fields = extract_custom_fields(full_contact, field_defs)
     campaign_data = build_campaign_data(custom_fields)
 
+    last_name     = full_contact.get("lastName", "")
     service_label = SERVICE_LABELS.get(campaign_data.get("type", ""), "Home Service")
     price_str     = get_appointment_price_label(campaign_data)
+    story_label   = campaign_data.get("home_stories", "").title() or "Unknown"
 
     new_title = (
         f"{service_label} – Est. {price_str} | Blue's Home Service"
@@ -408,12 +410,32 @@ def appointment_booked():
         f"{service_label} | Blue's Home Service"
     )
 
+    # Build calendar notes with job details visible at a glance
+    client_name = f"{first_name} {last_name}".strip()
+    notes_lines = [
+        f"Client: {client_name}",
+        f"Phone: {phone}" if phone else "",
+        f"Address: {address}" if address else "",
+        "",
+        f"Service: {service_label}",
+        f"Home Type: {story_label}",
+    ]
+    campaign_type = campaign_data.get("type", "")
+    if campaign_type == "windows" and campaign_data.get("window_count"):
+        notes_lines.append(f"Windows: {campaign_data['window_count']}")
+    elif campaign_type == "solar" and campaign_data.get("solar_count"):
+        notes_lines.append(f"Panels: {campaign_data['solar_count']}")
+    if price_str:
+        notes_lines.append(f"Estimate: {price_str}")
+    notes_str = "\n".join(line for line in notes_lines if line is not None)
+
     update_payload = {
         "calendarId":        calendar_id,
         "locationId":        location_id,
         "startTime":         start_time_raw,
         "endTime":           end_time_raw,
         "title":             new_title,
+        "notes":             notes_str,
         "appointmentStatus": "confirmed",
         "contactId":         contact_id,
     }
