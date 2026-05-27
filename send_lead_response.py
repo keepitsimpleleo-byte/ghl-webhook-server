@@ -412,11 +412,6 @@ def send_booking_sms(headers, contact_id, conversation_id, phone, first_name, co
 
 def get_owner_conversation(headers, location_id):
     """Return (contact_id, conversation_id) for the owner notification contact."""
-    contact_id = os.environ.get("GHL_OWNER_CONTACT_ID", "")
-    conv_id = os.environ.get("GHL_OWNER_CONV_ID", "")
-    if contact_id and conv_id:
-        return contact_id, conv_id
-
     owner_phone = os.environ.get("GHL_OWNER_PHONE", "+17252968281")
     resp = requests.get(f"{BASE_URL}/contacts/", headers=headers,
                         params={"locationId": location_id, "query": owner_phone})
