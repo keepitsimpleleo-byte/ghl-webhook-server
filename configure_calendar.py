@@ -47,8 +47,10 @@ THREE_WINDOWS = [
 def patch_calendar():
     """Set 3 fixed 1-hour windows and disable Google Calendar invitation emails."""
     payload = {
-        "slotDuration":          60,
-        "slotInterval":          60,
+        "slotDuration":           60,
+        "slotInterval":           60,
+        "preBuffer":              15,
+        "preBufferUnit":          "mins",
         "googleInvitationEmails": False,
         "openHours": [
             {"daysOfTheWeek": [d], "hours": THREE_WINDOWS}
