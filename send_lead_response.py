@@ -14,6 +14,10 @@ import logging
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 import requests
+try:
+    from twilio.rest import Client as TwilioClient
+except ImportError:
+    TwilioClient = None
 
 logging.basicConfig(
     level=logging.INFO,
@@ -453,6 +457,20 @@ def send_owner_notification(headers, location_id, first_name, last_name, phone, 
         log.info(f"Owner notified of new lead: {first_name} {last_name}")
     else:
         log.warning(f"Owner notification failed: {resp.status_code} {resp.text}")
+
+    # Also send a direct Twilio SMS so the text hits the owner's phone immediately
+    twilio_sid   = os.environ.get("TWILIO_ACCOUNT_SID", "")
+    twilio_token = os.environ.get("TWILIO_AUTH_TOKEN", "")
+    twilio_from  = os.environ.get("TWILIO_PHONE_NUMBER", "")
+    owner_phone  = os.environ.get("GHL_OWNER_PHONE", "+17252968281")
+    if TwilioClient and all([twilio_sid, twilio_token, twilio_from]):
+        try:
+            TwilioClient(twilio_sid, twilio_token).messages.create(
+                to=owner_phone, from_=twilio_from, body=message
+            )
+            log.info(f"Owner SMS (Twilio) sent to {owner_phone}")
+        except Exception as e:
+            log.error(f"Twilio owner SMS failed: {e}")
 
 
 def send_followup_sms(headers, contact_id, conversation_id, phone, first_name, campaign_data):
