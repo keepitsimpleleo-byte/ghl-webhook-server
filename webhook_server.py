@@ -560,11 +560,31 @@ def validate_ghl_config():
         log.error(f"❌ Could not list calendars — {resp2.status_code}. Check GHL_API_KEY scope.")
         all_ok = False
 
+    # 4. Twilio credentials
+    twilio_sid   = os.environ.get("TWILIO_ACCOUNT_SID", "")
+    twilio_token = os.environ.get("TWILIO_AUTH_TOKEN", "")
+    if twilio_sid and twilio_token:
+        try:
+            resp3 = requests.get(
+                f"https://api.twilio.com/2010-04-01/Accounts/{twilio_sid}.json",
+                auth=(twilio_sid, twilio_token), timeout=10)
+            if resp3.status_code == 200:
+                log.info(f"✅ Twilio credentials valid — {resp3.json().get('friendly_name', twilio_sid)}")
+            else:
+                log.error(f"❌ Twilio credentials invalid — {resp3.status_code}. "
+                          f"Update TWILIO_ACCOUNT_SID/TWILIO_AUTH_TOKEN, then redeploy.")
+                all_ok = False
+        except Exception as e:
+            log.error(f"❌ Twilio check failed: {e}")
+            all_ok = False
+    else:
+        log.warning("⚠️  Twilio credentials not set — owner SMS alerts will be disabled.")
+
     if all_ok:
         _ghl_health = {"status": "ok", "reason": ""}
-        log.info("✅ All GHL dependencies verified — server ready.")
+        log.info("✅ All dependencies verified — server ready.")
     else:
-        _ghl_health = {"status": "error", "reason": "one or more GHL checks failed — see startup logs"}
+        _ghl_health = {"status": "error", "reason": "one or more checks failed — see startup logs"}
         log.error("❌ Config issues detected — check logs above and fix env vars, then redeploy.")
 
 

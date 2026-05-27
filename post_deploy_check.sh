@@ -2,7 +2,7 @@
 # Post-deploy health check — runs automatically via Claude Code PostToolUse hook.
 # Fires after every Bash tool call; only acts when the command was a git push.
 
-HEALTH_URL="https://ghl-webhook-server-62c2.onrender.com/health"
+HEALTH_URL="${RENDER_HEALTH_URL:-https://ghl-webhook-server-62c2.onrender.com/health}"
 POLL_INTERVAL=10
 MAX_WAIT=120
 
