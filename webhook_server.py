@@ -40,6 +40,7 @@ from send_lead_response import (
     build_campaign_data,
     get_appointment_price_label,
     get_or_create_conversation,
+    get_owner_conversation,
     send_sms,
     send_pricing_sms,
     send_booking_sms,
@@ -505,9 +506,72 @@ def pricing():
     return response, 200
 
 
+_ghl_health = {"status": "unchecked", "reason": ""}
+
+
+def validate_ghl_config():
+    """
+    Run at startup. Tests every critical GHL dependency and logs a clear
+    pass/fail for each one. Failures are visible immediately in Render/Railway
+    logs after a key rotation or env var change.
+    """
+    global _ghl_health
+    headers = get_headers()
+    location_id = os.environ.get("GHL_LOCATION_ID", "")
+    calendar_id = os.environ.get("GHL_CALENDAR_ID", "WcMuX2qHzZeszRG4AzTM")
+    all_ok = True
+
+    # 1. API key + location ID — use contacts endpoint (same scope as production code)
+    resp = requests.get(f"{BASE_URL}/contacts/", headers=headers,
+                        params={"locationId": location_id, "limit": 1})
+    if resp.status_code == 200:
+        log.info(f"✅ GHL API key valid — location {location_id} accessible")
+    else:
+        log.error(f"❌ GHL API key or location invalid — {resp.status_code}. "
+                  f"Update GHL_API_KEY and GHL_LOCATION_ID in Render/Railway, then redeploy.")
+        all_ok = False
+
+    # 2. Owner contact lookup
+    try:
+        contact_id, conv_id = get_owner_conversation(headers, location_id)
+        owner_phone = os.environ.get("GHL_OWNER_PHONE", "+17252968281")
+        if contact_id:
+            log.info(f"✅ Owner contact found — ID: {contact_id} (phone {owner_phone})")
+        else:
+            log.error(f"❌ Owner contact not found for phone {owner_phone}. "
+                      f"Check GHL_OWNER_PHONE or run lookup_owner_contact.py.")
+            all_ok = False
+    except Exception as e:
+        log.error(f"❌ Owner contact lookup failed: {e}")
+        all_ok = False
+
+    # 3. Calendar ID — list calendars and confirm ours exists
+    resp2 = requests.get(f"{BASE_URL}/calendars/", headers=headers,
+                         params={"locationId": location_id})
+    if resp2.status_code == 200:
+        cal_ids = [c.get("id") for c in resp2.json().get("calendars", [])]
+        if calendar_id in cal_ids:
+            log.info(f"✅ Calendar accessible — ID {calendar_id} found in location")
+        else:
+            log.error(f"❌ Calendar ID {calendar_id} not found in this location. "
+                      f"Update GHL_CALENDAR_ID in Render/Railway, then redeploy.")
+            all_ok = False
+    else:
+        log.error(f"❌ Could not list calendars — {resp2.status_code}. Check GHL_API_KEY scope.")
+        all_ok = False
+
+    if all_ok:
+        _ghl_health = {"status": "ok", "reason": ""}
+        log.info("✅ All GHL dependencies verified — server ready.")
+    else:
+        _ghl_health = {"status": "error", "reason": "one or more GHL checks failed — see startup logs"}
+        log.error("❌ Config issues detected — check logs above and fix env vars, then redeploy.")
+
+
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok"}), 200
+    return jsonify({"status": "ok", "ghl": _ghl_health["status"],
+                    **( {"reason": _ghl_health["reason"]} if _ghl_health["reason"] else {} )}), 200
 
 
 if __name__ == "__main__":
@@ -518,4 +582,5 @@ if __name__ == "__main__":
     log.info(f"  /inbound-sms         → Event: Inbound Message (SMS, for pricing reply)")
     log.info(f"  /inbound-alert       → Event: Inbound Message (all channels, owner alert)")
     log.info(f"  /appointment-booked  → Event: AppointmentCreated")
+    validate_ghl_config()
     app.run(host="0.0.0.0", port=port)
