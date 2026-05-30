@@ -157,10 +157,15 @@ def detect_campaign(custom_fields):
         return "solar"
     if "window" in service:
         return "windows"
-    # Fallback: check which count field is populated
+    # Fallback 1: check which count field is populated
     if custom_fields.get("number of solar panels"):
         return "solar"
     if custom_fields.get("number of windows"):
+        return "windows"
+    # Fallback 2: check which timeline field is populated
+    if custom_fields.get("solar panel cleaning timeline"):
+        return "solar"
+    if custom_fields.get("window cleaning timeline"):
         return "windows"
     return "unknown"
 
@@ -431,7 +436,12 @@ def get_owner_conversation(headers, location_id):
 def send_owner_notification(headers, location_id, first_name, last_name, phone, campaign_data):
     """Send owner an SMS via GHL when a new lead arrives."""
     campaign = campaign_data.get("type", "unknown")
-    service = "Solar Panel Cleaning" if campaign == "solar" else "Window Cleaning"
+    if campaign == "solar":
+        service = "Solar Panel Cleaning"
+    elif campaign == "windows":
+        service = "Window Cleaning"
+    else:
+        service = "Unknown Service"
     count = campaign_data.get("solar_count") or campaign_data.get("window_count") or "?"
     stories = campaign_data.get("home_stories", "").title() or "?"
 
@@ -445,6 +455,7 @@ def send_owner_notification(headers, location_id, first_name, last_name, phone, 
 
     owner_contact_id, owner_conv_id = get_owner_conversation(headers, location_id)
     if not owner_contact_id or not owner_conv_id:
+        log.error("Owner notification skipped — could not find owner contact/conversation in GHL")
         return
 
     resp = requests.post(
