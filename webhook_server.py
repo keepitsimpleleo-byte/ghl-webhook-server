@@ -393,6 +393,9 @@ def appointment_booked():
         log.error(f"Could not fetch contact {contact_id}")
         return jsonify({"status": "error", "reason": "contact not found"}), 500
 
+    if not address:
+        address = full_contact.get("address1", "")
+
     first_name = full_contact.get("firstName", "there")
     phone      = full_contact.get("phone", "")
 
@@ -401,34 +404,74 @@ def appointment_booked():
     campaign_data = build_campaign_data(custom_fields)
 
     last_name     = full_contact.get("lastName", "")
+    city          = full_contact.get("city", "")
     service_label = SERVICE_LABELS.get(campaign_data.get("type", ""), "Home Service")
     price_str     = get_appointment_price_label(campaign_data)
     story_label   = campaign_data.get("home_stories", "").title() or "Unknown"
+    campaign_type = campaign_data.get("type", "")
+    timeline_raw  = campaign_data.get("timeline", "") or ""
+    timeline_disp = timeline_raw.replace("_", " ").title() if timeline_raw else ""
+    lead_id       = campaign_data.get("lead_id", "") or ""
 
-    new_title = (
-        f"{service_label} – Est. {price_str} | Blue's Home Service"
-        if price_str else
-        f"{service_label} | Blue's Home Service"
-    )
+    last_initial = (last_name[0].upper() + ".") if last_name else ""
+    name_part = f"{first_name} {last_initial}".strip() if last_initial else first_name
+    new_title = f"{name_part} – {service_label}"
 
-    # Build calendar notes with job details visible at a glance
+    # Job description paragraph for technician
     client_name = f"{first_name} {last_name}".strip()
-    notes_lines = [
-        f"Client: {client_name}",
-        f"Phone: {phone}" if phone else "",
-        f"Address: {address}" if address else "",
-        "",
+    if campaign_type == "windows":
+        win = campaign_data.get("window_count", "")
+        desc = (
+            f"{story_label} home window cleaning"
+            + (f", {win} windows" if win else "")
+            + "."
+        )
+        desc += " Confirm exterior vs. interior scope and screen cleaning preference on arrival."
+    elif campaign_type == "solar":
+        panels = campaign_data.get("solar_count", "")
+        desc = (
+            f"Solar panel cleaning"
+            + (f", {panels} panels" if panels else "")
+            + f" on a {story_label} home."
+        )
+        desc += " Confirm panel access and roof safety on arrival."
+    else:
+        desc = f"Home service appointment — {story_label} home."
+    if timeline_disp:
+        desc += f" Customer is ready: {timeline_disp}."
+    if price_str:
+        desc += f" Estimate: {price_str}."
+
+    # Build structured notes — keep "Home Type:", "Windows:", "Panels:", "Estimate:" prefixes
+    # so the appointment-reminder script can still parse job_details from notes
+    job_lines = [
         f"Service: {service_label}",
         f"Home Type: {story_label}",
     ]
-    campaign_type = campaign_data.get("type", "")
     if campaign_type == "windows" and campaign_data.get("window_count"):
-        notes_lines.append(f"Windows: {campaign_data['window_count']}")
+        job_lines.append(f"Windows: {campaign_data['window_count']}")
     elif campaign_type == "solar" and campaign_data.get("solar_count"):
-        notes_lines.append(f"Panels: {campaign_data['solar_count']}")
+        job_lines.append(f"Panels: {campaign_data['solar_count']}")
+    if timeline_disp:
+        job_lines.append(f"Timeline: {timeline_disp}")
     if price_str:
-        notes_lines.append(f"Estimate: {price_str}")
-    notes_str = "\n".join(line for line in notes_lines if line is not None)
+        job_lines.append(f"Estimate: {price_str}")
+
+    client_lines = [
+        f"Client: {client_name}",
+        f"Phone: {phone}" if phone else None,
+        f"City: {city}" if city else None,
+        f"Address: {address}" if address else None,
+    ]
+
+    notes_parts = [
+        "\n".join(job_lines),
+        "\n".join(l for l in client_lines if l),
+        desc,
+    ]
+    if lead_id:
+        notes_parts.append(f"Lead ID: {lead_id}")
+    notes_str = "\n\n".join(notes_parts)
 
     update_payload = {
         "calendarId":        calendar_id,

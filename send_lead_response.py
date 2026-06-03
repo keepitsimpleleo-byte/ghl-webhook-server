@@ -301,11 +301,19 @@ def build_campaign_data(custom_fields):
     home_stories = (custom_fields.get("home stories") or "").strip().lower()
     window_count = _clean_count(custom_fields.get("number of windows") or "")
     solar_count = _clean_count(custom_fields.get("number of solar panels") or "")
+    timeline = (
+        custom_fields.get("window cleaning timeline")
+        or custom_fields.get("solar panel cleaning timeline")
+        or ""
+    ).strip()
+    lead_id = (custom_fields.get("lead id") or "").strip()
     return {
-        "type": campaign_type,
+        "type":         campaign_type,
         "home_stories": home_stories,
         "window_count": window_count,
-        "solar_count": solar_count,
+        "solar_count":  solar_count,
+        "timeline":     timeline,
+        "lead_id":      lead_id,
     }
 
 
