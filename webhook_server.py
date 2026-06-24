@@ -87,6 +87,10 @@ def new_lead():
         log.info(f"Contact {contact_id} already contacted. Skipping.")
         return jsonify({"status": "skipped"}), 200
 
+    if "website-booked" in existing_tags:
+        log.info(f"Contact {contact_id} booked via website — skipping lead response (appointment-booked handles confirmation).")
+        return jsonify({"status": "skipped", "reason": "website-booked"}), 200
+
     # Fill in any fields the webhook payload left blank
     if full_contact:
         first_name = first_name or full_contact.get("firstName", "")
@@ -306,7 +310,7 @@ def inbound_alert():
 
     Required env vars:
       TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER
-      GHL_OWNER_PHONE  (defaults to +17252968281)
+      GHL_OWNER_PHONE  (defaults to +17255259671)
     """
     data = request.get_json(force=True) or {}
 
@@ -339,7 +343,7 @@ def inbound_alert():
         f"Reply in GHL or call them back."
     )
 
-    owner_phone   = os.environ.get("GHL_OWNER_PHONE", "+17252968281")
+    owner_phone   = os.environ.get("GHL_OWNER_PHONE", "+17255259671")
     twilio_sid    = os.environ.get("TWILIO_ACCOUNT_SID", "")
     twilio_token  = os.environ.get("TWILIO_AUTH_TOKEN", "")
     twilio_from   = os.environ.get("TWILIO_PHONE_NUMBER", "")
@@ -512,7 +516,7 @@ def appointment_booked():
     )
     if address:
         sms_body += f" Address: {address}."
-    sms_body += " Questions? Call or text (725) 296-8281. See you then!"
+    sms_body += " Questions? Call or text (725) 525-9671. See you then!"
 
     conversation_id = get_or_create_conversation(headers, contact_id, location_id)
     if conversation_id:
@@ -577,7 +581,7 @@ def validate_ghl_config():
     # 2. Owner contact lookup
     try:
         contact_id, conv_id = get_owner_conversation(headers, location_id)
-        owner_phone = os.environ.get("GHL_OWNER_PHONE", "+17252968281")
+        owner_phone = os.environ.get("GHL_OWNER_PHONE", "+17255259671")
         if contact_id:
             log.info(f"✅ Owner contact found — ID: {contact_id} (phone {owner_phone})")
         else:
