@@ -31,13 +31,15 @@ PRICING_TAG = "pricing-sent"
 BOOKING_TAG = "booking-link-sent"
 FOLLOWUP_TAG = "follow-up-sent"
 
-BOOKING_URL = "https://api.leadconnectorhq.com/widget/booking/WcMuX2qHzZeszRG4AzTM"
+_CALENDAR_ID = os.environ.get("GHL_CALENDAR_ID", "WcMuX2qHzZeszRG4AzTM")
+BOOKING_URL = f"https://api.leadconnectorhq.com/widget/booking/{_CALENDAR_ID}"
 CONSULT_URL = "https://api.leadconnectorhq.com/widget/bookings/blues-phone-consultation"
 
 # Maps campaign type → service label used in the booking page URL
 SERVICE_LABELS = {
-    "windows": "Window Cleaning",
-    "solar":   "Solar Panel Cleaning",
+    "windows":       "Window Cleaning",
+    "solar":         "Solar Panel Cleaning",
+    "solar_screens": "Solar Screen Installation",
 }
 LOOKBACK_MINUTES = 30
 
@@ -57,6 +59,16 @@ MAX_WINDOW_COUNT = int(_PRICING["window_cleaning"]["max_window_count"])
 SOLAR_RATES = {
     "single": _PRICING["solar_panels"]["single_story_per_panel"],
     "double": _PRICING["solar_panels"]["double_story_per_panel"],
+}
+
+SOLAR_SCREEN_RATES = {
+    "promo_per_sq_ft":   _PRICING["solar_screens"]["promo_per_sq_ft"],
+    "regular_per_sq_ft": _PRICING["solar_screens"]["regular_per_sq_ft"],
+    "avg_sq_ft":         _PRICING["solar_screens"]["avg_sq_ft_per_screen"],
+    "min_sq_ft":         _PRICING["solar_screens"]["min_sq_ft_per_screen"],
+    "max_sq_ft":         _PRICING["solar_screens"]["max_sq_ft_per_screen"],
+    "min_screens":       int(_PRICING["solar_screens"]["min_screens"]),
+    "promo_end":         _PRICING["solar_screens"]["promo_end"],
 }
 
 
@@ -151,18 +163,25 @@ def extract_custom_fields(contact, field_id_map):
 
 
 def detect_campaign(custom_fields):
-    """Return 'windows', 'solar', or 'unknown' based on Service Interest field."""
+    """Return 'windows', 'solar', 'solar_screens', or 'unknown' based on Service Interest field."""
     service = (custom_fields.get("service interest") or "").lower()
+    # Check solar_screens BEFORE solar to avoid collision ("solar screen" contains "solar")
+    if "solar screen" in service or "screen install" in service:
+        return "solar_screens"
     if "solar" in service or "panel" in service:
         return "solar"
     if "window" in service:
         return "windows"
     # Fallback 1: check which count field is populated
+    if custom_fields.get("number of solar screens"):
+        return "solar_screens"
     if custom_fields.get("number of solar panels"):
         return "solar"
     if custom_fields.get("number of windows"):
         return "windows"
     # Fallback 2: check which timeline field is populated
+    if custom_fields.get("solar screen installation timeline"):
+        return "solar_screens"
     if custom_fields.get("solar panel cleaning timeline"):
         return "solar"
     if custom_fields.get("window cleaning timeline"):
@@ -203,11 +222,16 @@ def get_window_price(window_count_text):
     max_c = min(max_c, MAX_WINDOW_COUNT)
     r = WINDOW_RATES
 
+    ext = _price_range(min_c * r['exterior_no_screens'], max_c * r['exterior_no_screens'])
+    int_ext = _price_range(
+        min_c * (r['exterior_no_screens'] + r['interior_add_no_screens']),
+        max_c * (r['exterior_no_screens'] + r['interior_add_no_screens'])
+    )
     return (
-        f"Exterior only (no screen cleaning): {_price_range(min_c * r['exterior_no_screens'], max_c * r['exterior_no_screens'])}\n"
-        f"Exterior only (with screen cleaning): {_price_range(min_c * r['exterior_with_screens'], max_c * r['exterior_with_screens'])}\n"
-        f"Interior + Exterior (no screen cleaning): {_price_range(min_c * (r['exterior_no_screens'] + r['interior_add_no_screens']), max_c * (r['exterior_no_screens'] + r['interior_add_no_screens']))}\n"
-        f"Interior + Exterior (with screen cleaning): {_price_range(min_c * (r['exterior_with_screens'] + r['interior_add_with_screens']), max_c * (r['exterior_with_screens'] + r['interior_add_with_screens']))}"
+        f"Exterior only (screen cleaning included): {ext}\n"
+        f"Interior + Exterior (screen cleaning included): {int_ext}\n\n"
+        f"Please note that this estimate is for regular screens NOT solar screens. "
+        f"If your home has solar screens, there will be an additional cost."
     )
 
 
@@ -234,6 +258,23 @@ def get_solar_price(home_stories, panel_range):
     return _price_range(low, high)
 
 
+def get_solar_screens_price(screen_count_text):
+    min_c, max_c = parse_window_count(screen_count_text)
+    if min_c is None:
+        return "Reply with your screen count and I'll get you a promo price right away!"
+    r = SOLAR_SCREEN_RATES
+    # Range spans small windows (min_sq_ft) to large windows (max_sq_ft) so quote is always a spread
+    low      = min_c * r["min_sq_ft"] * r["promo_per_sq_ft"]
+    high     = max_c * r["max_sq_ft"] * r["promo_per_sq_ft"]
+    reg_low  = min_c * r["min_sq_ft"] * r["regular_per_sq_ft"]
+    reg_high = max_c * r["max_sq_ft"] * r["regular_per_sq_ft"]
+    return (
+        f"Summer Promo (ends {r['promo_end']}): {_price_range(low, high)}\n"
+        f"Regular price: {_price_range(reg_low, reg_high)}\n"
+        f"You save 40%!"
+    )
+
+
 def get_appointment_price_label(campaign_data):
     """Return a short price string for a calendar event title (e.g. '$130–$390'), or None."""
     campaign_type = campaign_data.get("type", "")
@@ -250,6 +291,15 @@ def get_appointment_price_label(campaign_data):
         if min_p is None:
             return None
         return _price_range(min_p * rate, max_p * rate)
+    if campaign_type == "solar_screens":
+        r = SOLAR_SCREEN_RATES
+        min_c, max_c = parse_window_count(campaign_data.get("screen_count", ""))
+        if min_c is None:
+            return None
+        return _price_range(
+            min_c * r["avg_sq_ft"] * r["promo_per_sq_ft"],
+            max_c * r["avg_sq_ft"] * r["promo_per_sq_ft"],
+        )
     return None
 
 
@@ -301,8 +351,10 @@ def build_campaign_data(custom_fields):
     home_stories = (custom_fields.get("home stories") or "").strip().lower()
     window_count = _clean_count(custom_fields.get("number of windows") or "")
     solar_count = _clean_count(custom_fields.get("number of solar panels") or "")
+    screen_count = _clean_count(custom_fields.get("number of solar screens") or window_count or "")
     timeline = (
-        custom_fields.get("window cleaning timeline")
+        custom_fields.get("solar screen installation timeline")
+        or custom_fields.get("window cleaning timeline")
         or custom_fields.get("solar panel cleaning timeline")
         or ""
     ).strip()
@@ -312,6 +364,7 @@ def build_campaign_data(custom_fields):
         "home_stories": home_stories,
         "window_count": window_count,
         "solar_count":  solar_count,
+        "screen_count": screen_count,
         "timeline":     timeline,
         "lead_id":      lead_id,
     }
@@ -325,6 +378,8 @@ def send_sms(headers, contact_id, conversation_id, phone, first_name, campaign_d
         template_name = "sms_initial_windows.txt"
     elif campaign == "solar":
         template_name = "sms_initial_solar.txt"
+    elif campaign == "solar_screens":
+        template_name = "sms_initial_solar_screens.txt"
     else:
         template_name = "sms_initial.txt"
 
@@ -333,6 +388,7 @@ def send_sms(headers, contact_id, conversation_id, phone, first_name, campaign_d
         "home_stories": campaign_data.get("home_stories") or "single or double story",
         "window_count": campaign_data.get("window_count") or "your",
         "solar_count":  campaign_data.get("solar_count") or "your",
+        "screen_count": campaign_data.get("screen_count") or "your",
     })
 
     payload = {
@@ -371,6 +427,15 @@ def send_pricing_sms(headers, contact_id, conversation_id, phone, first_name, ca
             "first_name":   first_name or "there",
             "home_stories": home_stories or "your",
             "solar_count":  solar_count or "your",
+            "price_range":  price_range,
+        })
+    elif campaign == "solar_screens":
+        screen_count = campaign_data.get("screen_count", "")
+        price_range = get_solar_screens_price(screen_count)
+        message_body = render_template("sms_pricing_solar_screens.txt", {
+            "first_name":   first_name or "there",
+            "home_stories": home_stories or "your",
+            "screen_count": screen_count or "your",
             "price_range":  price_range,
         })
     else:
@@ -429,7 +494,7 @@ def send_booking_sms(headers, contact_id, conversation_id, phone, first_name, co
 
 def get_owner_conversation(headers, location_id):
     """Return (contact_id, conversation_id) for the owner notification contact."""
-    owner_phone = os.environ.get("GHL_OWNER_PHONE", "+17252968281")
+    owner_phone = os.environ.get("GHL_OWNER_PHONE", "+17255259671")
     resp = requests.get(f"{BASE_URL}/contacts/", headers=headers,
                         params={"locationId": location_id, "query": owner_phone})
     contacts = resp.json().get("contacts", []) if resp.status_code == 200 else []
@@ -448,9 +513,11 @@ def send_owner_notification(headers, location_id, first_name, last_name, phone, 
         service = "Solar Panel Cleaning"
     elif campaign == "windows":
         service = "Window Cleaning"
+    elif campaign == "solar_screens":
+        service = "Solar Screen Installation"
     else:
         service = "Unknown Service"
-    count = campaign_data.get("solar_count") or campaign_data.get("window_count") or "?"
+    count = campaign_data.get("screen_count") or campaign_data.get("solar_count") or campaign_data.get("window_count") or "?"
     stories = campaign_data.get("home_stories", "").title() or "?"
 
     message = (
@@ -481,7 +548,7 @@ def send_owner_notification(headers, location_id, first_name, last_name, phone, 
     twilio_sid   = os.environ.get("TWILIO_ACCOUNT_SID", "")
     twilio_token = os.environ.get("TWILIO_AUTH_TOKEN", "")
     twilio_from  = os.environ.get("TWILIO_PHONE_NUMBER", "")
-    owner_phone  = os.environ.get("GHL_OWNER_PHONE", "+17252968281")
+    owner_phone  = os.environ.get("GHL_OWNER_PHONE", "+17255259671")
     if TwilioClient and all([twilio_sid, twilio_token, twilio_from]):
         try:
             TwilioClient(twilio_sid, twilio_token).messages.create(
@@ -495,7 +562,12 @@ def send_owner_notification(headers, location_id, first_name, last_name, phone, 
 def send_followup_sms(headers, contact_id, conversation_id, phone, first_name, campaign_data):
     """Send a follow-up SMS to leads who haven't replied to Stage 1."""
     campaign = campaign_data.get("type", "unknown")
-    service_type = "solar panel cleaning" if campaign == "solar" else "window cleaning"
+    if campaign == "solar":
+        service_type = "solar panel cleaning"
+    elif campaign == "solar_screens":
+        service_type = "solar screen installation"
+    else:
+        service_type = "window cleaning"
     message_body = render_template("sms_followup.txt", {
         "first_name": first_name or "there",
         "service_type": service_type,
@@ -543,8 +615,10 @@ def send_email(headers, contact_id, conversation_id, email, first_name, campaign
         service_line = f"window cleaning ({campaign_data.get('window_count', '')} windows, {campaign_data.get('home_stories', '')} home)"
     elif campaign == "solar":
         service_line = f"solar panel cleaning ({campaign_data.get('solar_count', '')} panels)"
+    elif campaign == "solar_screens":
+        service_line = f"solar screen installation ({campaign_data.get('screen_count', '')} screens, {campaign_data.get('home_stories', '')} home)"
     else:
-        service_line = "window or solar panel cleaning"
+        service_line = "home services"
 
     html_template = load_template("email_initial.html")
     html_body = (html_template
