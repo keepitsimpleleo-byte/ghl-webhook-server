@@ -2,7 +2,7 @@
   "window_cleaning": {
     "exterior_no_screens":          10.00,
     "exterior_with_screens":        13.00,
-    "interior_add_no_screens":       5.00,
+    "interior_add_no_screens":       8.00,
     "interior_add_with_screens":     6.50,
     "max_window_count":             30
   },
@@ -41,7 +41,7 @@
     "min_screens":          5
   },
   "notes": {
-    "window_pricing":       "Per-window pricing. All four options shown in quote.",
+    "window_pricing":       "Per-window pricing: Exterior only $10/window, Interior + Exterior $18/window. Regular screen cleaning included free.",
     "solar_pricing":        "Flat per-panel pricing ($8/panel, single or double story).",
     "solar_subscription_pricing": "Blue Shield Package tiers: Quarterly/Biannual billed per visit, Annual billed upfront for 3 visits with the 4th free.",
     "solar_screens_pricing":"Per-screen pricing at $13/sq ft promo ($16 regular). Avg 12 sq ft per screen.",

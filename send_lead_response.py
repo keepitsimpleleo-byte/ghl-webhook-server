@@ -68,7 +68,6 @@ SOLAR_SCREEN_RATES = {
     "min_sq_ft":         _PRICING["solar_screens"]["min_sq_ft_per_screen"],
     "max_sq_ft":         _PRICING["solar_screens"]["max_sq_ft_per_screen"],
     "min_screens":       int(_PRICING["solar_screens"]["min_screens"]),
-    "promo_end":         _PRICING["solar_screens"]["promo_end"],
 }
 
 
@@ -210,7 +209,7 @@ def _price_range(low, high):
 
 def get_window_price(window_count_text):
     """
-    Return a multi-line pricing breakdown for all four service options.
+    Return a two-line pricing breakdown (Exterior only / Interior + Exterior).
     Shows a price range when the lead submitted a window count range (e.g. '5–15').
     """
     min_c, max_c = parse_window_count(window_count_text)
@@ -228,10 +227,10 @@ def get_window_price(window_count_text):
         max_c * (r['exterior_no_screens'] + r['interior_add_no_screens'])
     )
     return (
-        f"Exterior only (screen cleaning included): {ext}\n"
-        f"Interior + Exterior (screen cleaning included): {int_ext}\n\n"
-        f"Please note that this estimate is for regular screens NOT solar screens. "
-        f"If your home has solar screens, there will be an additional cost."
+        f"Exterior only: {ext}\n"
+        f"Interior + Exterior: {int_ext}\n\n"
+        f"This includes FREE regular screen cleaning. "
+        f"Solar screens will require an additional charge."
     )
 
 
@@ -269,7 +268,7 @@ def get_solar_screens_price(screen_count_text):
     reg_low  = min_c * r["min_sq_ft"] * r["regular_per_sq_ft"]
     reg_high = max_c * r["max_sq_ft"] * r["regular_per_sq_ft"]
     return (
-        f"Summer Promo (ends {r['promo_end']}): {_price_range(low, high)}\n"
+        f"Promo price: {_price_range(low, high)}\n"
         f"Regular price: {_price_range(reg_low, reg_high)}\n"
         f"You save 40%!"
     )
