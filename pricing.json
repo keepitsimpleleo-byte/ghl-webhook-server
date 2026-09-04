@@ -7,12 +7,44 @@
     "max_window_count":             30
   },
   "solar_panels": {
-    "single_story_per_panel":        5.00,
+    "single_story_per_panel":        8.00,
     "double_story_per_panel":        8.00
   },
+  "solar_subscription": {
+    "quarterly": {
+      "single_story_per_panel":  6.00,
+      "double_story_per_panel":  9.00,
+      "visits_per_year":         4,
+      "billing":                 "per_visit"
+    },
+    "biannual": {
+      "single_story_per_panel":  7.50,
+      "double_story_per_panel": 11.25,
+      "visits_per_year":         2,
+      "billing":                 "per_visit"
+    },
+    "annual": {
+      "single_story_per_panel": 10.00,
+      "double_story_per_panel": 15.00,
+      "paid_visits":             3,
+      "free_visits":             1,
+      "visits_per_year":         4,
+      "billing":                 "upfront_lump_sum"
+    }
+  },
+  "solar_screens": {
+    "promo_per_sq_ft":     13.00,
+    "regular_per_sq_ft":   16.00,
+    "avg_sq_ft_per_screen": 12.0,
+    "min_sq_ft_per_screen": 10,
+    "max_sq_ft_per_screen": 16,
+    "min_screens":          5
+  },
   "notes": {
-    "window_pricing": "Per-window pricing. All four options shown in quote.",
-    "solar_pricing":  "Per-panel pricing based on home stories (single vs double).",
-    "max_windows":    "Quotes above 30 windows prompt a custom quote request."
+    "window_pricing":       "Per-window pricing. All four options shown in quote.",
+    "solar_pricing":        "Flat per-panel pricing ($8/panel, single or double story).",
+    "solar_subscription_pricing": "Blue Shield Package tiers: Quarterly/Biannual billed per visit, Annual billed upfront for 3 visits with the 4th free.",
+    "solar_screens_pricing":"Per-screen pricing at $13/sq ft promo ($16 regular). Avg 12 sq ft per screen.",
+    "max_windows":          "Quotes above 30 windows prompt a custom quote request."
   }
 }
