@@ -27,7 +27,7 @@ log = logging.getLogger(__name__)
 
 HEALTH_URL = os.environ.get("RENDER_HEALTH_URL", "https://ghl-webhook-server-62c2.onrender.com/health")
 STATE_FILE = Path.home() / ".ghl-health-state.json"
-OWNER_PHONE = os.environ.get("GHL_OWNER_PHONE", "+17252968281")
+OWNER_PHONE = os.environ.get("GHL_OWNER_PHONE", "+17255259671")
 
 
 def load_state():

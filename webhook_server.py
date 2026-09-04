@@ -239,7 +239,10 @@ def inbound_sms():
     )
 
     if success:
-        tag_contact(headers, contact_id, existing_tags, extra_tags=[PRICING_TAG])
+        extra_tags = [PRICING_TAG]
+        if campaign_data.get("type") == "solar":
+            extra_tags.append("solar-panels")
+        tag_contact(headers, contact_id, existing_tags, extra_tags=extra_tags)
         return jsonify({"status": "pricing_sent"}), 200
     else:
         return jsonify({"status": "error"}), 500

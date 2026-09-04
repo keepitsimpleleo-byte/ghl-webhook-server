@@ -29,7 +29,7 @@ if _env_path.exists():
 GHL_API_KEY     = os.environ.get("GHL_API_KEY", "")
 GHL_LOCATION_ID = os.environ.get("GHL_LOCATION_ID", "")
 GHL_CALENDAR_ID = os.environ.get("GHL_CALENDAR_ID", "WcMuX2qHzZeszRG4AzTM")
-GHL_OWNER_PHONE = os.environ.get("GHL_OWNER_PHONE", "+17252968281")
+GHL_OWNER_PHONE = os.environ.get("GHL_OWNER_PHONE", "+17255259671")
 TWILIO_SID      = os.environ.get("TWILIO_ACCOUNT_SID", "")
 TWILIO_TOKEN    = os.environ.get("TWILIO_AUTH_TOKEN", "")
 NETLIFY_PAT     = os.environ.get("NETLIFY_PAT", "")

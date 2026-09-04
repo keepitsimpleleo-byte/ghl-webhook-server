@@ -215,10 +215,9 @@ def get_window_price(window_count_text):
     min_c, max_c = parse_window_count(window_count_text)
     if min_c is None:
         return "Reply with your window count and I'll get you a price right away!"
-    if min_c > MAX_WINDOW_COUNT:
+    if max_c > MAX_WINDOW_COUNT:
         return "Reply for a custom quote — our team will get you an exact price!"
 
-    max_c = min(max_c, MAX_WINDOW_COUNT)
     r = WINDOW_RATES
 
     ext = _price_range(min_c * r['exterior_no_screens'], max_c * r['exterior_no_screens'])
@@ -235,7 +234,11 @@ def get_window_price(window_count_text):
 
 
 def parse_panel_range(panel_range_text):
-    """Parse '1–10', '20–30', or '26+' into (min, max). '+' suffix means up to 100 panels."""
+    """Parse '1–10', '20–30', or '26+' into (min, max).
+
+    An open-ended '+' bucket (e.g. '26+') is capped at min+15 so the quote stays a
+    realistic spread instead of running out to 100 panels.
+    """
     text = panel_range_text or ""
     has_plus = "+" in text
     numbers = re.findall(r'\d+', text)
@@ -243,7 +246,7 @@ def parse_panel_range(panel_range_text):
         return int(numbers[0]), int(numbers[1])
     if len(numbers) == 1:
         n = int(numbers[0])
-        return n, 100 if has_plus else n
+        return n, (n + 15 if has_plus else n)
     return None, None
 
 

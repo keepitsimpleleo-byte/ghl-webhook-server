@@ -1,0 +1,7 @@
+Thank you {{first_name}}! Got your solar screen request.
+
+Just to confirm — you have a {{home_stories}} home and need {{screen_count}} solar screens installed. Does that sound right?
+
+Reply YES to confirm and I'll send you our Summer Promo price right away!
+
+— Blue's Home Services (725) 525-9671

@@ -14,7 +14,7 @@ import sys
 import requests
 
 BASE_URL = "https://services.leadconnectorhq.com"
-OWNER_PHONE = os.environ.get("GHL_OWNER_PHONE", "+17252968281")
+OWNER_PHONE = os.environ.get("GHL_OWNER_PHONE", "+17255259671")
 
 
 def require_env(name):
